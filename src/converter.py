@@ -36,9 +36,8 @@ class Evaluator(Interpreter):
         self.visit_children(tree)
         result = {}
         if self.values:
-            values = ", ".join(map(encode_toml, self.values))
-            result["_values"] = f"[{values}]"
-        return "".join(f"{k} = {v}\n" for k, v in result.items())
+            result["_values"] = self.values
+        return "".join(f"{k} = {encode_toml(v)}\n" for k, v in result.items())
 
     def standalone(self, tree):
         """Сохраняет отдельное значение верхнего уровня."""
@@ -55,9 +54,15 @@ class Evaluator(Interpreter):
             raise ConfigError(f"{location(tree)}: недопустимый символ Unicode")
         return value
 
+    def array(self, tree):
+        """Вычисляет элементы массива."""
+        return [self.visit(value) for value in tree.children[1:]]
+
 
 def encode_toml(value):
     """Кодирует целое, вещественное число, строку или массив TOML."""
+    if isinstance(value, list):
+        return "[" + ", ".join(map(encode_toml, value)) + "]"
     if isinstance(value, str):
         encoded = json.dumps(value, ensure_ascii=False)
         return encoded.replace("\x7f", r"\u007F")

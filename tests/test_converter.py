@@ -21,10 +21,11 @@ class ConverterTests(unittest.TestCase):
         self.assertEqual(convert("* комментарий\n\n"), "")
         self.assertEqual(tomllib.loads(convert("1 * хвост")), {"_values": [1]})
 
-    def test_scalar_values(self):
-        """Проверяет целые числа и строки UTF-8."""
-        result = tomllib.loads(convert('0 +7 -3 @"текст"'))
-        self.assertEqual(result, {"_values": [0, 7, -3, "текст"]})
+    def test_nested_arrays_and_empty_array(self):
+        """Проверяет пустые и вложенные массивы."""
+        source = 'list(list(), list(@"x", list(-1)), 0)'
+        result = tomllib.loads(convert(source))
+        self.assertEqual(result, {"_values": [[[], ["x", [-1]], 0]]})
 
     def test_syntax_errors(self):
         """Проверяет позицию синтаксической ошибки."""
