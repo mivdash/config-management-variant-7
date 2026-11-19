@@ -19,13 +19,29 @@ class ConverterTests(unittest.TestCase):
     def test_comments_and_empty_input(self):
         """Проверяет комментарии и пустой файл."""
         self.assertEqual(convert("* комментарий\n\n"), "")
-        self.assertEqual(tomllib.loads(convert("1 * хвост")), {"_values": [1]})
+        self.assertEqual(tomllib.loads(convert("a := 1 * хвост")), {"a": 1})
+
+    def test_integers_and_strings(self):
+        """Проверяет знаки и экранирование строк."""
+        source = r'text := @"Привет * \"мир\"\n" nums := list(+7,-3,-0,0)'
+        result = tomllib.loads(convert(source))
+        self.assertEqual(result, {"text": 'Привет * "мир"\n',
+                                  "nums": [7, -3, 0, 0]})
+        self.assertEqual(tomllib.loads(convert(r'@"\u007f"'))["_values"],
+                         [chr(127)])
 
     def test_nested_arrays_and_empty_array(self):
         """Проверяет пустые и вложенные массивы."""
-        source = 'list(list(), list(@"x", list(-1)), 0)'
+        source = 'items := list(list(), list(@"x", list(-1)), 0)'
         result = tomllib.loads(convert(source))
-        self.assertEqual(result, {"_values": [[[], ["x", [-1]], 0]]})
+        self.assertEqual(result, {"items": [[], ["x", [-1]], 0]})
+
+    def test_declarations(self):
+        """Проверяет ключи TOML и повторное объявление."""
+        output = tomllib.loads(convert("port := 8080"))
+        self.assertEqual(output, {"port": 8080})
+        with self.assertRaisesRegex(ConfigError, "повторное объявление"):
+            convert("port := 8080 port := 80")
 
     def test_syntax_errors(self):
         """Проверяет позицию синтаксической ошибки."""

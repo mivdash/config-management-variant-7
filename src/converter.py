@@ -29,19 +29,32 @@ class Evaluator(Interpreter):
     def __init__(self):
         """Создаёт состояние для одного входного файла."""
         super().__init__()
+        self.constants = {}
         self.values = []
 
     def start(self, tree):
-        """Обрабатывает значения и формирует TOML."""
+        """Обрабатывает объявления и формирует TOML."""
         self.visit_children(tree)
-        result = {}
+        result = dict(self.constants)
         if self.values:
             result["_values"] = self.values
         return "".join(f"{k} = {encode_toml(v)}\n" for k, v in result.items())
 
+    def declaration(self, tree):
+        """Вычисляет и сохраняет объявление константы."""
+        name_node, value = tree.children
+        name = self.visit(name_node)
+        if name in self.constants:
+            raise ConfigError(f"{location(tree)}: повторное объявление {name}")
+        self.constants[name] = self.visit(value)
+
     def standalone(self, tree):
         """Сохраняет отдельное значение верхнего уровня."""
         self.values.append(self.visit(tree.children[0]))
+
+    def name(self, tree):
+        """Возвращает идентификатор как строку."""
+        return str(tree.children[0])
 
     def integer(self, tree):
         """Преобразует токен целого числа."""
