@@ -1,6 +1,8 @@
 """Преобразование учебного конфигурационного языка в TOML."""
 
 import json
+import math
+import operator
 from pathlib import Path
 
 from lark import Lark, Token, Tree, UnexpectedInput
@@ -11,6 +13,7 @@ PARSER = Lark.open(
     GRAMMAR, parser="lalr", propagate_positions=True,
     maybe_placeholders=False,
 )
+INVALID_ARITHMETIC = "арифметическая операция требует числовых аргументов"
 
 
 class ConfigError(ValueError):
@@ -56,6 +59,13 @@ class Evaluator(Interpreter):
         """Возвращает идентификатор как строку."""
         return str(tree.children[0])
 
+    def reference(self, tree):
+        """Находит ранее объявленную константу."""
+        name = self.visit(tree.children[0])
+        if name not in self.constants:
+            raise ConfigError(f"{location(tree)}: неизвестная константа {name}")
+        return self.constants[name]
+
     def integer(self, tree):
         """Преобразует токен целого числа."""
         return int(tree.children[0])
@@ -70,6 +80,36 @@ class Evaluator(Interpreter):
     def array(self, tree):
         """Вычисляет элементы массива."""
         return [self.visit(value) for value in tree.children[1:]]
+
+    def expression(self, tree):
+        """Вычисляет префиксную операцию."""
+        return self.visit(tree.children[0])
+
+    def add(self, tree):
+        """Складывает два числовых операнда."""
+        return self.calculate(tree, operator.add, tree.children)
+
+    def subtract(self, tree):
+        """Вычитает второй числовой операнд из первого."""
+        return self.calculate(tree, operator.sub, tree.children)
+
+    def square_root(self, tree):
+        """Вычисляет квадратный корень."""
+        return self.calculate(tree, math.sqrt, tree.children[1:])
+
+    def calculate(self, tree, operation, operands):
+        """Проверяет типы и переводит ошибки вычисления в диагностику."""
+        values = [self.visit(operand) for operand in operands]
+        if any(not isinstance(value, (int, float)) for value in values):
+            raise ConfigError(f"{location(tree)}: {INVALID_ARITHMETIC}")
+        try:
+            result = operation(*values)
+        except (ValueError, OverflowError) as error:
+            message = "недопустимый аргумент или переполнение"
+            raise ConfigError(f"{location(tree)}: {message}") from error
+        if isinstance(result, float) and not math.isfinite(result):
+            raise ConfigError(f"{location(tree)}: переполнение")
+        return result
 
 
 def encode_toml(value):
