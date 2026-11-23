@@ -94,6 +94,18 @@ class CliTests(unittest.TestCase):
             capture_output=True, text=True, encoding="utf-8", check=False,
         )
 
+    def test_examples(self):
+        """Проверяет вывод TOML для трёх примеров."""
+        cases = (("server", "connections", 150),
+                 ("warehouse", "available", 85),
+                 ("geometry", "side", 50 ** 0.5))
+        for name, key, expected in cases:
+            with self.subTest(name=name):
+                process = self.invoke(ROOT / "examples" / f"{name}.cfg")
+                self.assertEqual(process.returncode, 0, process.stderr)
+                self.assertEqual(process.stderr, "")
+                self.assertEqual(tomllib.loads(process.stdout)[key], expected)
+
     def test_cli_error(self):
         """Проверяет код возврата и потоки при ошибке."""
         with tempfile.TemporaryDirectory() as directory:
